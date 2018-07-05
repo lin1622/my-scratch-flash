@@ -24,7 +24,6 @@ import flash.utils.*;
 import flash.text.*;
 import uiwidgets.*;
 import util.Color;
-import flash.external.ExternalInterface;
 
 public class ListCell extends Sprite {
 
@@ -80,7 +79,6 @@ public class ListCell extends Sprite {
 		tf.addEventListener(FocusEvent.FOCUS_IN, focusChange);
 		tf.addEventListener(FocusEvent.FOCUS_OUT, focusChange);
 		addChild(tf);
-
 	}
 
 	public function select():void {

@@ -79,7 +79,10 @@ public class SVGDisplayRender {
 			tf.selectable = false;
 			tf.mouseEnabled = false;
 			tf.tabEnabled = false;
-			el.renderTextOn(tf);
+            if(/[^\x00-\xff]/g.test(el.text) && !/[^\x00-\xff]/g.test(el.attributes["font-family"])){
+                el.attributes["font-family"] = "宋体";
+            }
+            el.renderTextOn(tf);
 			addLayer(tf);
 		} else if (el.path) {
 //			if (!currentShape) currentShape = new Shape();

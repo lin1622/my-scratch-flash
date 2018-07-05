@@ -129,7 +129,12 @@ public class SVGImporter {
 			if ((ns == '') || (ns == 'http://www.w3.org/1999/xlink')) {
 				// ignore non-standard attributes (e.g. those added by Adobe, Inkscape, etc)
 				var attrName:String = attr.localName();
-				var attrValue:String = attr.toString();
+                var attrValue:String = attr.toString();
+                if(attrName == "font-family"){
+                    if(/[^\x00-\xff]/g.test(xml.text) && !/[^\x00-\xff]/g.test(attrValue)){
+                        attrValue = "宋体";
+                    }
+                }
 				if (attrName == 'style') addStyleAttributes(result, attrValue);
 				else result.attributes[attrName] = convertUnits(attrValue);
 			}

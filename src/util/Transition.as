@@ -18,8 +18,6 @@
  */
 
 package util {
-	import flash.utils.getTimer;
-
 public class Transition {
 
 	private static var activeTransitions:Array = [];
@@ -48,7 +46,7 @@ public class Transition {
 		} else {
 			delta = endValue - startValue;
 		}
-		startMSecs = getTimer();
+		startMSecs = CachedTimer.getCachedTimer();
 		duration = 1000 * secs;
 	}
 
@@ -66,7 +64,7 @@ public class Transition {
 
 	public static function step(evt:*):void {
 		if (activeTransitions.length == 0) return;
-		var now:uint = getTimer();
+		var now:uint = CachedTimer.getCachedTimer();
 		var newActive:Array = [];
 		for each (var t:Transition in activeTransitions) {
 			 if (t.apply(now)) newActive.push(t);

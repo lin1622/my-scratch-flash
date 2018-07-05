@@ -35,7 +35,6 @@ import ui.parts.UIPart;
 
 import uiwidgets.*;
 
-
 public class DrawPropertyUI extends Sprite {
 
 	public static const ONCHANGE:String = 'onchange';
@@ -347,7 +346,7 @@ public class DrawPropertyUI extends Sprite {
 			m.addItem('Marker');
 			m.addItem('Mystery');
 			m.addItem('Scratch');
-			//linm  字体选择添加 中文字体
+            m.addItem("仿宋");
             m.addItem("宋体");
             m.addItem("楷体");
             m.addItem("黑体");

@@ -43,10 +43,8 @@ package svgeditor.tools
 		}
 
 		public function editSelection(s:Selection):void {
-			if(s && s.getObjs().length == 1) {
-                setObject(s.getObjs()[0] as ISVGEditable);
-			}
-
+			if(s && s.getObjs().length == 1)
+				setObject(s.getObjs()[0] as ISVGEditable);
 		}
 
 		public function setObject(obj:ISVGEditable):void {

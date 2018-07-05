@@ -132,6 +132,7 @@ public class StagePart extends UIPart {
 
 	public function projectName():String { return projectTitle.contents() }
 	public function setProjectName(s:String):void { projectTitle.setContents(s) }
+    public function focusProjectName() : void{ projectTitle.focus();}
 	public function isInPresentationMode():Boolean { return fullscreenButton.visible && fullscreenButton.isOn() }
 
 	public function presentationModeWasChanged(isPresentationMode:Boolean):void {
@@ -338,7 +339,12 @@ public class StagePart extends UIPart {
 	}
 
 	protected function getProjectTitle(fmt:TextFormat):EditableLabel {
-		return new EditableLabel(null, fmt);
+        var textChanged:Function = null;
+        textChanged = function():*
+        {
+            app.checkProjectName(projectTitle.contents(),true);
+        };
+		return new EditableLabel(textChanged, fmt);
 	}
 
 	public function updateVersionInfo(newVersion:String):void {
@@ -371,7 +377,7 @@ public class StagePart extends UIPart {
 	}
 
 	protected function updateProjectInfo():void {
-		projectTitle.setEditable(false);
+		projectTitle.setEditable(true);
 		projectInfo.text = '';
 	}
 

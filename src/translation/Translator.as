@@ -18,22 +18,20 @@
  */
 
 package translation {
+import blocks.Block;
+
 import flash.events.Event;
-import flash.external.ExternalInterface;
-import flash.net.FileReference;
+import flash.net.*;
 import flash.utils.ByteArray;
 import flash.utils.Dictionary;
 
-import mx.utils.StringUtil;
-
-import blocks.Block;
-
 import logging.LogLevel;
+
+import mx.utils.StringUtil;
 
 import uiwidgets.Menu;
 
-import util.ReadStream;
-import util.StringUtils;
+import util.*;
 
 public class Translator {
 
@@ -51,11 +49,11 @@ public class Translator {
 	// Get a list of language names for the languages menu from the server.
 	public static function initializeLanguageList():void {
 
-		var newLanguages:Array = [];
-		newLanguages.push(['zh-cn', '简体中文']);
-		newLanguages.push(['zh-tw', '正體中文']);
-		newLanguages.push(['en', 'English']);
-		languages = newLanguages;
+        var newLanguages:Array = [];
+        newLanguages.push(['zh-CN', '简体中文']);
+        newLanguages.push(['tw-CN', '繁体中文']);
+        newLanguages.push(['en', 'English']);
+        languages = newLanguages;
 	}
 
 	public static function setLanguageValue(lang:String):void {

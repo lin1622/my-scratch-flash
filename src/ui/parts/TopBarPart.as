@@ -23,46 +23,24 @@
 // This part holds the Scratch Logo, cursor tools, screen mode buttons, and more.
 
 package ui.parts {
-import flash.display.Bitmap;
-import flash.display.Graphics;
-import flash.display.Shape;
-import flash.display.Sprite;
-import flash.events.MouseEvent;
-import flash.external.ExternalInterface;
-import flash.text.TextField;
-import flash.text.TextFormat;
-
 import assets.Resources;
 
 import extensions.ExtensionDevManager;
 
+import flash.display.*;
+import flash.events.MouseEvent;
+import flash.text.*;
+
 import translation.Translator;
 
-import uiwidgets.Button;
-import uiwidgets.CursorTool;
-import uiwidgets.IconButton;
-import uiwidgets.Menu;
-import uiwidgets.SimpleTooltips;
+import uiwidgets.*;
 
 public class TopBarPart extends UIPart {
 
 	private var shape:Shape;
-	
-	//linm 小码
-	protected var xiaomaButton:IconButton;
-	//发布按钮
-    protected var publishButton:Button;
-	//保存按钮
-    protected var saveButton:Button;
-	//保存成功失败状态
-    protected var saveStatusLabel:TextField;
-	//用户按钮
-    protected var userMenu:IconButton;
-
 	protected var logoButton:IconButton;
 	protected var languageButton:IconButton;
 
-	protected var myNameMenu:IconButton;
 	protected var fileMenu:IconButton;
 	protected var editMenu:IconButton;
 
@@ -81,6 +59,18 @@ public class TopBarPart extends UIPart {
 	protected var exportButton:Button;
 	protected var extensionLabel:TextField;
 
+    protected var saveButton:Button;//保存
+    protected var publishButton:Button;//发布
+    protected var userMenu:IconButton; //用户菜单
+    protected var loginButton:IconButton;//登录
+    protected var unSaveLabel:TextField;//未保存
+    private const unSaveFormat:TextFormat = new TextFormat(CSS.font,13,CSS.gray,true);
+    protected var saveStatusLabel:TextField;//保存状态
+    protected var seeProjectButton:Button;//查看作品
+	public var tipLabel:TextField;
+
+	public var submitButtonName:String;
+
 	public function TopBarPart(app:Scratch) {
 		this.app = app;
 		addButtons();
@@ -90,7 +80,6 @@ public class TopBarPart extends UIPart {
 
 	protected function addButtons():void {
 		addChild(shape = new Shape());
-		addxiomaButtons();
 		addChild(languageButton = new IconButton(app.setLanguagePressed, 'languageButton'));
 		languageButton.isMomentary = true;
 		addTextButtons();
@@ -112,14 +101,73 @@ public class TopBarPart extends UIPart {
 		}
 	}
 
+	public function refreshButtons():void{
+        saveButton && removeChild(saveButton);
+        publishButton && removeChild(publishButton);
+        unSaveLabel && removeChild(unSaveLabel);
+        saveStatusLabel && removeChild(saveStatusLabel);
+        loginButton && removeChild(loginButton);
+        seeProjectButton && removeChild(seeProjectButton);
+        userMenu && removeChild(userMenu);
+        saveButton = null;
+        publishButton = null;
+        unSaveLabel = null;
+        saveStatusLabel = null;
+        loginButton = null;
+        userMenu = null;
+        seeProjectButton = null;
+		//判断是否登录 如果未登录 显示未登录  已登录显示个人菜单
+		if(!app.isLogin){
+            addChild(this.loginButton = makeMenuButton(Translator.map("Login"),function():void{
+                app.login();
+            }));
+		}else {
+            addChild(this.userMenu = makeMenuButton(Translator.map("Me"),app.showUserMenu,true));
+		}
+		//初始化保存状态
+        addChild(this.saveStatusLabel = makeLabel("",this.offlineNoticeFormat,w - 300,5));
+
+		if (app.modifiable) {
+            addChild(this.saveButton = new Button("Save",function():void{
+                app.externalCall("save",null,app.projectId);
+            }));
+            if(app.fromType == '1'){
+                submitButtonName = "Publish";
+            }
+            if(app.fromType == '2') {
+                submitButtonName = "subHomework";
+            }
+            addChild(this.publishButton = new Button('Publish',function():void{
+                if(!app.isLogin){
+                    app.login();
+                }else{
+                    app.externalCall("publish",null,app.saveNeeded,app.projectId);
+                }
+            }));
+		}
+
+        this.updateNewButtonsTranslation();
+        this.refresh();
+	}
+
+    public function updateNewButtonsTranslation() : void
+    {
+//        if(this.tipLabel){this.tipLabel.text = Translator.map("Click Remix to save");}
+        loginButton && loginButton.setLabel(Translator.map("Login"),16777215,CSS.buttonLabelOverColor,false);
+        publishButton && publishButton.setLabel(Translator.map(submitButtonName));
+        saveButton && saveButton.setLabel(Translator.map("Save"));
+        if(unSaveLabel){unSaveLabel.text = Translator.map("Can not save");}
+        userMenu && userMenu.setLabel(Translator.map("Me"),16777215,CSS.buttonLabelOverColor,true);
+        seeProjectButton && seeProjectButton.setLabel(Translator.map("See project page"));
+    }
+
 	public static function strings():Array {
 		if (Scratch.app) {
 			Scratch.app.showFileMenu(Menu.dummyButton());
-			Scratch.app.showEditMenu(Menu.dummyButton());
+            Scratch.app.showEditMenu(Menu.dummyButton());
             Scratch.app.showUserMenu(Menu.dummyButton());
 		}
-		//linm 增加 保存 发布
-		return ['File', 'Edit', 'Tips', 'Duplicate', 'Delete', 'Grow', 'Shrink', 'Block help', 'Offline Editor','Save','Publish'];
+		return ['File', 'Edit', 'Tips', 'Duplicate', 'Delete', 'Grow', 'Shrink', 'Block help', 'Offline Editor','Save','Publish','Login','subHomework'];
 	}
 
 	protected function removeTextButtons():void {
@@ -131,9 +179,9 @@ public class TopBarPart extends UIPart {
 
 	public function updateTranslation():void {
 		removeTextButtons();
-		addTextButtons();
-		//linm
         updateNewButtonsTranslation();
+		addTextButtons();
+
 		if (offlineNotice) offlineNotice.text = Translator.map('Offline Editor');
 		refresh();
 	}
@@ -151,12 +199,6 @@ public class TopBarPart extends UIPart {
 
 	protected function fixLogoLayout():int {
 		var nextX:int = 9;
-		if (xiaomaButton) {
-			xiaomaButton.x = nextX;
-			xiaomaButton.y = 5;
-			nextX += xiaomaButton.width + buttonSpace;
-		}
-
 		if (logoButton) {
 			logoButton.x = nextX;
 			logoButton.y = 5;
@@ -170,11 +212,10 @@ public class TopBarPart extends UIPart {
 		const buttonY:int = 5;
 
 		var nextX:int = fixLogoLayout();
-		
+
 		languageButton.x = nextX;
 		languageButton.y = buttonY - 1;
 		nextX += languageButton.width + buttonSpace;
-//	
 
 		// new/more/tips buttons
 		fileMenu.x = nextX;
@@ -200,29 +241,45 @@ public class TopBarPart extends UIPart {
 		}
 
 		// From here down, nextX is the next item's right edge and decreases after each item
-		nextX = w - 15;
-		//用户菜单
-        if(userMenu) {
-            userMenu.x = nextX - userMenu.width;
-            userMenu.y = buttonY;
-            nextX = userMenu.x - 25;
+        nextX = w - 5;
+		if(this.userMenu)
+        {
+            this.userMenu.x = nextX - this.userMenu.width;
+            this.userMenu.y = buttonY;
+            nextX = this.userMenu.x - 25;
         }
-		// 保存状态
-        if(saveStatusLabel){
-            saveStatusLabel.x = nextX - 60;
-            saveStatusLabel.y = buttonY;
+
+        if(this.loginButton)
+        {
+            this.loginButton.x = nextX - this.loginButton.width;
+            this.loginButton.y = buttonY;
+            nextX = this.loginButton.x - 25;
         }
-		// 发布按钮
-        if(publishButton){
-            publishButton.x = nextX - publishButton.width + 50;
-            publishButton.y = h + 5;
-            nextX = publishButton.x - 5;
+        if(this.saveStatusLabel)
+        {
+            this.saveStatusLabel.x = nextX - 60;
+            this.saveStatusLabel.y = buttonY;
         }
-		// 保存按钮
-        if(saveButton){
-            saveButton.x = nextX - saveButton.width;
-            saveButton.y = h + 5;
-            nextX = saveButton.x - 5;
+
+		//登录按钮 nextX = w - 5;
+        nextX = w - 15;
+        if(this.publishButton)
+        {
+            this.publishButton.x = nextX - this.publishButton.width;
+            this.publishButton.y = h + 5;
+            nextX = this.publishButton.x - 5;
+        }
+        if(this.unSaveLabel)
+        {
+            this.unSaveLabel.x = nextX - this.unSaveLabel.width;
+            this.unSaveLabel.y = h + 7;
+            nextX = this.unSaveLabel.x - 5;
+        }
+        if(this.saveButton)
+        {
+            this.saveButton.x = nextX - this.saveButton.width;
+            this.saveButton.y = h + 5;
+            nextX = this.saveButton.x - 5;
         }
 
 		if (loadExperimentalButton) {
@@ -243,15 +300,24 @@ public class TopBarPart extends UIPart {
 			nextX = extensionLabel.x - 5;
 		}
 	}
+	//更新保存状态
+    public function refreshSaveStatus(param1:String) : void{
+        this.hideTipLabel();
+        this.saveStatusLabel.text = Translator.map(param1);
+    }
 
-	public function refresh():void {
+    public function hideTipLabel() : void{
+        if(this.tipLabel)
+        {
+            this.tipLabel.visible = false;
+        }
+    }
+
+
+    public function refresh():void {
 		if (app.isOffline) {
 			helpTool.visible = app.isOffline;
 		}
-		//保存
-        if(app.saveNeeded){
-            saveStatusLabel.text = "";
-        }
 
 		if (Scratch.app.isExtensionDevMode) {
 			var hasExperimental:Boolean = app.extensionManager.hasExperimentalExtensions();
@@ -266,50 +332,8 @@ public class TopBarPart extends UIPart {
 		}
 		fixLayout();
 	}
-	
-	//linm 添加小码王logo
-	protected function addxiomaButtons():void {
-		//var label:TextField = makeLabel(s, CSS.topBarButtonFormat);
-		//label.textColor = labelColor;
-		addChild(xiaomaButton = makeMenuButton('xiaomawang', 
-			app.logoButtonPressed,
-			false));
-	}
 
-    public function updateNewButtonsTranslation() : void{
-        userMenu && userMenu.setLabel(Translator.map("Me"),16777215,CSS.buttonLabelOverColor,true);
-        saveButton && saveButton.setLabel(Translator.map("Save"));
-        publishButton && publishButton.setLabel(Translator.map("Publish"));
-    }
-
-    public function refreshButtons():void{
-        saveButton && removeChild(saveButton);
-        publishButton && removeChild(publishButton);
-        userMenu && removeChild(userMenu);
-
-        saveButton = null;
-        publishButton = null;
-        userMenu = null;
-
-        addChild(userMenu = makeMenuButton(Translator.map("Me"),app.showUserMenu,true));
-        addChild(saveStatusLabel = makeLabel("",offlineNoticeFormat,w - 300,5));
-        addChild(saveButton = new Button("Save",function():void{
-            app.externalCall("save",null,app.projectId);
-        }));
-        addChild(publishButton = new Button("Publish",function():void{
-            app.externalCall("publish",null,app.saveNeeded,app.projectId);
-        }));
-
-        updateNewButtonsTranslation();
-        refresh();
-    }
-
-    public function refreshSaveStatus(param1:String) : void{
-        saveStatusLabel.text = Translator.map(param1);
-    }
-
-
-    protected function addTextButtons():void {
+	protected function addTextButtons():void {
 		addChild(fileMenu = makeMenuButton('File', app.showFileMenu, true));
 		addChild(editMenu = makeMenuButton('Edit', app.showEditMenu, true));
 	}

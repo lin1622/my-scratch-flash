@@ -64,6 +64,7 @@ import svgeditor.objs.*;
 
 		public function SVGEdit(app:Scratch, imagesPart:ImagesPart) {
 			super(app, imagesPart);
+
 			PathEndPointManager.init(this);
 			setToolMode('path');
 		}

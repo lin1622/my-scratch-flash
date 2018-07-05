@@ -55,7 +55,6 @@ public class SVGExport {
 		// Return the exported SVG file as a byte array.
 		var s:String = svgString();
 		var data: ByteArray = new ByteArray();
-		trace(s);
 		data.writeUTFBytes(s);
 		return data;
 	}

@@ -26,6 +26,8 @@
 // if the operation succeeded or null if it failed.
 
 package util {
+import by.blooddy.crypto.serialization.JSON;
+
 import flash.display.BitmapData;
 import flash.display.Loader;
 import flash.events.ErrorEvent;
@@ -33,7 +35,6 @@ import flash.events.Event;
 import flash.events.HTTPStatusEvent;
 import flash.events.IOErrorEvent;
 import flash.events.SecurityErrorEvent;
-import flash.external.ExternalInterface;
 import flash.geom.Matrix;
 import flash.net.SharedObject;
 import flash.net.URLLoader;
@@ -45,18 +46,15 @@ import flash.system.Capabilities;
 import flash.system.Security;
 import flash.utils.ByteArray;
 
-import mx.utils.URLUtil;
-
-import by.blooddy.crypto.serialization.JSON;
-
 import logging.LogLevel;
+
+import mx.utils.URLUtil;
 
 public class Server implements IServer {
 
 	protected var URLs:Object = {};
 
 	public function Server() {
-        this.URLs = {};
 		setDefaultURLs();
 
 		// Accept URL overrides from the flash variables
@@ -92,11 +90,6 @@ public class Server implements IServer {
 	protected function getCdnStaticSiteURL():String {
 		return URLs.siteCdnPrefix + URLs.staticFiles;
 	}
-
-	//linm 获取 sb 地址
-    public function getProjectUrl():String{
-        return this.URLs.projectUrl;
-    }
 
 	// Returns a URL for downloading the JS for an official extension given input like 'myExtension.js'
 	public function getOfficialExtensionURL(extensionName:String):String {
@@ -259,14 +252,9 @@ public class Server implements IServer {
 
 	// Make a simple GET. Uses the same callbacks as callServer().
 	public function serverGet(url:String, whenDone:Function):URLLoader {
-		
 		return callServer(url, null, null, whenDone);
 	}
-	
-	//linm post 
-	public function serverPost(url:String, data:*, mimeType:String, whenDone:Function,queryParams:Object = null):URLLoader {
-		return callServer(url, data, mimeType, whenDone,queryParams);
-	}
+
 	// -----------------------------
 	// Asset API
 	//------------------------------
@@ -275,8 +263,7 @@ public class Server implements IServer {
 //			whenDone(BackpackPart.localAssets[md5]);
 //			return null;
 //		}
-//		var url:String = URLs.assetCdnPrefix + URLs.internalAPI + 'asset/' + md5 + '/get/';
-		var url:String = getCdnStaticSiteURL() + 'medialibrarythumbnails/' + md5;
+		var url:String =  getCdnStaticSiteURL() + 'medialibraries/'+ md5 ;
 		return serverGet(url, whenDone);
 	}
 
@@ -328,7 +315,7 @@ public class Server implements IServer {
 	}
 
 	public function getThumbnail(idAndExt:String, w:int, h:int, whenDone:Function):URLLoader {
-		var url:String = getCdnStaticSiteURL() + 'medialibrarythumbnails/' + idAndExt;
+		var url:String = getCdnStaticSiteURL() + 'medialibraries/' + idAndExt;
 		return downloadThumbnail(url, w, h, whenDone);
 	}
 
@@ -337,34 +324,26 @@ public class Server implements IServer {
 	//------------------------------
 
 	public function getLanguageList(whenDone:Function):void {
-//		var langUrl:String;
-//		langUrl = getCdnStaticSiteURL();
-//		serverGet(langUrl + 'lang_list.txt', whenDone);
+		serverGet('locale/lang_list.txt', whenDone);
 	}
 
 	public function getPOFile(lang:String, whenDone:Function):void {
-		
-		//serverGet('locale/' + lang + '.po', whenDone);
-		var poUrl:String;
-		poUrl = getCdnStaticSiteURL();
-		serverGet(poUrl +  lang + '.po', whenDone);
+		serverGet('locale/' + lang + '.po', whenDone);
 	}
 
 	public function getSelectedLang(whenDone:Function):void {
 		// Get the language setting.
-		var currentlang:String = Scratch.app.loaderInfo.parameters['current_lang']
-		if (currentlang) whenDone(currentlang);
 //		var sharedObj:SharedObject = SharedObject.getLocal('Scratch');
-//		whenDone('zh-cn');
-//		whenDone('en');
+//		if (sharedObj.data.lang) whenDone(sharedObj.data.lang);
+        whenDone('zh-cn')
 	}
 
 	public function setSelectedLang(lang:String):void {
 		// Record the language setting.
-//		var sharedObj:SharedObject = SharedObject.getLocal('Scratch');
-//		if (lang == '') lang = 'en';
-//		sharedObj.data.lang = lang;
-//		sharedObj.flush();
+		var sharedObj:SharedObject = SharedObject.getLocal('Scratch');
+		if (lang == '') lang = 'zh-cn';
+		sharedObj.data.lang = lang;
+		sharedObj.flush();
 	}
 }
 }

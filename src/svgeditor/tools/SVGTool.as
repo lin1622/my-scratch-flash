@@ -93,6 +93,7 @@ public class SVGTool extends Sprite
 
 	static public function staticGetEditableUnderMouse(editor:ImageEdit, includeGroups:Boolean = true, currentTool:SVGTool = null):ISVGEditable {
 		var objs:Array = STAGE.getObjectsUnderPoint(new Point(STAGE.mouseX, STAGE.mouseY));
+
 		// Select the top object that is ISVGEditable
 		if(objs.length) {
 			// Try to find the topmost element whose parent is the selection context

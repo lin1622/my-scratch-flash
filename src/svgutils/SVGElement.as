@@ -243,20 +243,24 @@ public class SVGElement {
 			(getAttribute('font-weight') == 'bold'),
 			(getAttribute('font-style') == 'italic')
 		);
-		//linm 支持中文字体宋体
 		if (useEmbeddedFont) {
             if(/[^\x00-\xff]/g.test(this.text) && !/[^\x00-\xff]/g.test(this.attributes["font-family"])){
-                this.attributes["font-family"] = "宋体";
+                attributes["font-family"] = "宋体";
             }
-			if (!hasEmbeddedFont(fmt.font)) {
+            if(!hasEmbeddedFont(fmt.font)){
+                tf.embedFonts = false;
+            }else{
+                tf.embedFonts = true;
+            }
+            tf.antiAliasType = AntiAliasType.ADVANCED;
+
+
+//			if (!hasEmbeddedFont(fmt.font)) {
 //				setAttribute('font-family', 'Helvetica');
 //				fmt.font = 'Helvetica';
-                tf.embedFonts = false;
-			} else {
-                tf.embedFonts = true;
-			}
-
-			tf.antiAliasType = AntiAliasType.ADVANCED;
+//			}
+//			tf.embedFonts = true;
+//			tf.antiAliasType = AntiAliasType.ADVANCED;
 		}
 		tf.defaultTextFormat = fmt;
 		tf.text = text;

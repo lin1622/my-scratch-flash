@@ -140,7 +140,6 @@ public class MediaLibraryItem extends Sprite {
 		// if not in the thumbnail cache, fetch/compute it
 		if (fileType(md5) == 'svg') loaders.push(Scratch.app.server.getAsset(md5, gotSVGData));
 		else loaders.push(Scratch.app.server.getThumbnail(md5, thumbnailWidth, thumbnailHeight, setThumbnail));
-//		loaders.push(Scratch.app.server.getThumbnail(md5, thumbnailWidth, thumbnailHeight, setThumbnail))
 	}
 
 	// all paths must call done() even on failure!

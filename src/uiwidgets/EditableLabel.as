@@ -32,9 +32,11 @@ package uiwidgets {
 
 public class EditableLabel extends Sprite {
 
-	private const defaultFormat:TextFormat = new TextFormat(CSS.font, 13, 0x929497);
-	private const bgColor:int = 0xFFFFFF;
-	private const frameColor:int = 0xA6A8AB;
+    private const defaultFormat:TextFormat = new TextFormat(CSS.font,13,9606295);
+
+    private const bgColor:int = 16777215;
+
+    private const frameColor:int = 10922155;
 
 	public var tf:TextField;
 
@@ -64,7 +66,11 @@ public class EditableLabel extends Sprite {
 		tf.width = w - 3;
 		tf.height = h - 1;
 	}
-
+    public function focus() : void
+    {
+        this.tf.stage.focus = this.tf;
+        this.tf.setSelection(0,this.tf.length);
+    }
 	public function contents():String { return tf.text }
 	public function setContents(s:String):void { tf.text = s }
 	public function setEditable(flag:Boolean):void {

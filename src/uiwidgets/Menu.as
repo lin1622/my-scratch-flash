@@ -31,8 +31,9 @@ package uiwidgets {
 	import flash.events.*;
 	import flash.filters.DropShadowFilter;
 	import flash.geom.Point;
-	import flash.utils.getTimer;
 	import translation.TranslatableStrings;
+
+import util.CachedTimer;
 
 public class Menu extends Sprite {
 
@@ -192,8 +193,8 @@ public class Menu extends Sprite {
 			return;
 		}
 
-		if ((getTimer() - lastTime) < scrollMSecs) return;
-		lastTime = getTimer();
+		if ((CachedTimer.getCachedTimer() - lastTime) < scrollMSecs) return;
+		lastTime = CachedTimer.getCachedTimer();
 
 		var localY:int = this.globalToLocal(new Point(stage.mouseX, stage.mouseY)).y;
 		if ((localY < (2 + scrollInset)) && (firstItemIndex > 0)) scrollBy(-1);

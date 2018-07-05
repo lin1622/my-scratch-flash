@@ -62,7 +62,6 @@ import extensions.ExtensionManager;
 
 import flash.geom.Point;
 import flash.utils.Dictionary;
-import flash.utils.getTimer;
 
 import primitives.*;
 
@@ -70,10 +69,12 @@ import scratch.*;
 
 import sound.*;
 
+import util.CachedTimer;
+
 public class Interpreter {
 
-	public var activeThread:Thread;				// current thread
-	public var currentMSecs:int = getTimer();	// millisecond clock for the current step
+	public var activeThread:Thread;         // current thread
+	public var currentMSecs:int;            // millisecond clock for the current step
 	public var turboMode:Boolean = false;
 
 	private var app:Scratch;
@@ -219,12 +220,23 @@ public class Interpreter {
 		doRedraw = true;
 	}
 
+	private const workTimeCheckIntervalFactor:Number = 1/3.0;
+	private var iterationCountEstimate: Number = 1; // start low to avoid appearance of hang
+
+	private function addIterationCountSample(sample:uint):void {
+		// Exponential moving average: simulate N=10 with a=2/(N+1)=2/11
+		const alpha:Number = 2.0/11.0;
+		iterationCountEstimate += alpha * (sample - iterationCountEstimate);
+	}
+
 	public function stepThreads():void {
-		startTime = getTimer();
 		var workTime:int = (0.75 * 1000) / app.stage.frameRate; // work for up to 75% of one frame time
 		doRedraw = false;
-		currentMSecs = getTimer();
+		startTime = currentMSecs = CachedTimer.getFreshTimer();
 		if (threads.length == 0) return;
+		var iterationCount:uint = 0;
+		var checkInterval:uint = Math.round(workTimeCheckIntervalFactor * iterationCountEstimate);
+		var checkCount:uint = 0;
 		while ((currentMSecs - startTime) < workTime) {
 			if (warpThread && (warpThread.block == null)) clearWarpBlock();
 			var threadStopped:Boolean = false;
@@ -247,9 +259,18 @@ public class Interpreter {
 				threads = newThreads;
 				if (threads.length == 0) return;
 			}
-			currentMSecs = getTimer();
 			if (doRedraw || (runnableCount == 0)) return;
+			++iterationCount;
+			++checkCount;
+			if (checkCount >= checkInterval) {
+				currentMSecs = CachedTimer.getFreshTimer();
+				checkCount = 0;
+			}
 		}
+		// if we get here, this was a frame where we needed to check the timer twice or more
+		// use the elapsed time and actual iteration count to generate an estimate for iterations per step
+		var newEstimate:uint = Math.round(workTime * iterationCount / Number(currentMSecs - startTime));
+		addIterationCountSample(newEstimate);
 	}
 
 	private function stepActiveThread():void {
@@ -265,7 +286,7 @@ public class Interpreter {
 		}
 		yield = false;
 		while (true) {
-			if (activeThread == warpThread) currentMSecs = getTimer();
+			if (activeThread == warpThread) currentMSecs = CachedTimer.getFreshTimer();
 			evalCmd(activeThread.block);
 			if (yield) {
 				if (activeThread == warpThread) {

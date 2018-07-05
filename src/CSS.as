@@ -50,6 +50,7 @@ public class CSS {
 	public static const onColor:int = textColor; // 0x4C4D4F
 	public static const overColor:int = 0x179FD7;
 	public static const arrowColor:int = 0xA6A8AC;
+    public static const gray:int = 9474706;
 
 	// Fonts
 	public static const font:String = Resources.chooseFont(['Arial', 'Verdana', 'DejaVu Sans']);

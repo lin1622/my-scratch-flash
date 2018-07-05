@@ -43,7 +43,6 @@ import ui.parts.ImagesPart;
 import uiwidgets.*;
 
 import util.ProjectIO;
-import flash.external.ExternalInterface;
 
 public class ImageEdit extends Sprite {
 
@@ -187,6 +186,7 @@ public class ImageEdit extends Sprite {
 
 	private var globalToolObject:ISVGEditable;
 	private function workAreaMouseDown(event:MouseEvent):void {
+
 		if (!CursorTool.tool) {
 			globalToolObject = null;
 			return;
@@ -520,7 +520,6 @@ public class ImageEdit extends Sprite {
 		var sel:Selection;
 		var obj:ISVGEditable;
 		var fontName:String = drawPropsUI.settings.fontName;
-
 		if (toolMode == 'select') {
 			sel = objectTransformer.getSelection();
 			if (sel) {
@@ -533,12 +532,10 @@ public class ImageEdit extends Sprite {
 		else if (currentTool is TextTool) {
 			obj = (currentTool as TextTool).getObject();
 			if (obj) {
-				trace(fontName);
-                obj.getElement().setFont(fontName);
+				obj.getElement().setFont(fontName);
 				obj.redraw();
 			}
 		}
-
 		currentTool.refresh();
 		saveContent();
 	}

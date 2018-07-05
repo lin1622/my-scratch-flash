@@ -23,29 +23,15 @@
 // This is the top-level application.
 
 package {
-import blocks.Block;
+import blocks.*;
 
-import util.JSON;
-
-//linm
-import by.blooddy.crypto.MD5;//linm
 import com.adobe.utils.StringUtil;
 
-import flash.display.DisplayObject;
-import flash.display.Graphics;
-import flash.display.Shape;
-import flash.display.Sprite;
-import flash.display.StageAlign;
-import flash.display.StageDisplayState;
-import flash.display.StageScaleMode;
-import flash.events.ErrorEvent;
-import flash.events.Event;
-import flash.events.IOErrorEvent;
-import flash.events.KeyboardEvent;
-import flash.events.NetStatusEvent;//linm
-import flash.events.MouseEvent;
-import flash.events.SecurityErrorEvent;
-import flash.events.UncaughtErrorEvent;
+import extensions.ExtensionDevManager;
+import extensions.ExtensionManager;
+
+import flash.display.*;
+import flash.events.*;
 import flash.external.ExternalInterface;
 import flash.geom.Point;
 import flash.geom.Rectangle;
@@ -53,85 +39,46 @@ import flash.net.FileFilter;
 import flash.net.FileReference;
 import flash.net.FileReferenceList;
 import flash.net.LocalConnection;
+import flash.net.SharedObject;
+import flash.net.SharedObjectFlushStatus;
 import flash.net.URLLoader;
 import flash.net.URLLoaderDataFormat;
 import flash.net.URLRequest;
-import flash.system.System;
-import flash.system.Security;//linm
-import flash.system.Capabilities;//linm
+import flash.system.*;
+import flash.text.*;
+import flash.utils.*;
 
-import flash.text.TextField;
-import flash.text.TextFieldAutoSize;
-import flash.text.TextFormat;
-import flash.utils.ByteArray;
-import flash.utils.getTimer;
-
-import mx.utils.URLUtil;
-
-import blocks.Block;
-
-import extensions.ExtensionDevManager;
-import extensions.ExtensionManager;
-
-import interpreter.Interpreter;
+import interpreter.*;
 
 import logging.Log;
 import logging.LogEntry;
 import logging.LogLevel;
 
+import mx.utils.URLUtil;
+
 import render3d.DisplayObjectContainerIn3D;
 
-import scratch.BlockMenus;
-import scratch.PaletteBuilder;
-import scratch.ScratchCostume;
-import scratch.ScratchObj;
-import scratch.ScratchRuntime;
-import scratch.ScratchSound;
-import scratch.ScratchSprite;
-import scratch.ScratchStage;
+import scratch.*;
 
 import svgeditor.tools.SVGTool;
 
-import translation.Translator;
+import translation.*;
 
-import ui.BlockPalette;
-import ui.CameraDialog;
-import ui.LoadProgress;
-import ui.media.MediaInfo;
-import ui.media.MediaLibrary;
-import ui.media.MediaPane;
-import ui.parts.ImagesPart;
-import ui.parts.LibraryPart;
-import ui.parts.ScriptsPart;
-import ui.parts.SoundsPart;
-import ui.parts.StagePart;
-import ui.parts.TabsPart;
-import ui.parts.TopBarPart;
+import ui.*;
+import ui.media.*;
+import ui.parts.*;
 
-import uiwidgets.BlockColorEditor;
-import uiwidgets.CursorTool;
-import uiwidgets.DialogBox;
-import uiwidgets.IconButton;
-import uiwidgets.Menu;
-import uiwidgets.ScriptsPane;
+import uiwidgets.*;
 
-import util.Base64Encoder;
-import util.GestureHandler;
-import util.JSON;
-import util.ProjectIO;
-import util.Server;
-import util.Transition;
+import util.*;
 
 import watchers.ListWatcher;
-
-
+//上传文件
 import easis.common.UploadPostHelper2;
-import flash.display.BitmapData;
-import com.adobe.images.JPGEncoder;
 
 public class Scratch extends Sprite {
 	// Version
-	public static const versionString:String = 'v458.0.1';
+	public static const versionString:String = 'v461.1';
 	public static var app:Scratch; // static reference to the app, used for debugging
 
 	// Display modes
@@ -182,7 +129,7 @@ public class Scratch extends Sprite {
 
 	// UI Parts
 	public var libraryPart:LibraryPart;
-	protected var topBarPart:TopBarPart;
+    public var topBarPart:TopBarPart;
 	protected var stagePart:StagePart;
 	private var tabsPart:TabsPart;
 	protected var scriptsPart:ScriptsPart;
@@ -191,26 +138,33 @@ public class Scratch extends Sprite {
 	public const tipsBarClosedWidth:int = 17;
 
 	public var logger:Log = new Log(16);
-	
-	
 
-
-	//save Stauts
-    public var saveNeeded:Boolean;
-	//linm 自定义
-    public var userName:String;//用户姓名
-    public var projectUrl:String;//sb2 Url
-    public var projectname:String;//sb2 标题
-    public var projectId:String;//sb2 id
+	//自定义数据
+	public var userName:String;
+	public var projectId:int;
+    public var projectKd:String;
+	public var isMine:Boolean;//是否是他人的作品
+	public var isLogin:Boolean;
+	public var modifiable:Boolean;
+	public var sharedObject:SharedObject;
+	public var projectname:String;
 	public var isPublish:Boolean;
+	public var projectUrl:String;
+	public var tokenKey:String;
+	public var isSplit:Boolean;
+	public var uploadServer:String;
+    public var assetByteCount:int;//作品大小
+	public var defaultName:String;
+	public var fromType:String;
 
-    public function Scratch() {
 
+	public function Scratch() {
         Security.allowDomain("*");
         Security.allowInsecureDomain("*");
 		SVGTool.setStage(stage);
 		loaderInfo.uncaughtErrorEvents.addEventListener(UncaughtErrorEvent.UNCAUGHT_ERROR, uncaughtErrorHandler);
 		app = this;
+
 		// This one must finish before most other queries can start, so do it separately
 		determineJSAccess();
 	}
@@ -218,7 +172,7 @@ public class Scratch extends Sprite {
 	protected function determineJSAccess():void {
 		if (externalInterfaceAvailable()) {
 			try {
-				externalCall('function(){ return true;}', jsAccessDetermined);
+				externalCall('function(){return true;}', jsAccessDetermined);
 				return; // wait for callback
 			}
 			catch (e:Error) {
@@ -227,6 +181,10 @@ public class Scratch extends Sprite {
 		jsAccessDetermined(false);
 	}
 
+    public function trackEvent(param1:String) : void{
+        this.externalCall("trackEvent",null,param1);
+    }
+
 	private function jsAccessDetermined(result:Boolean):void {
 		jsEnabled = result;
 		initialize();
@@ -234,20 +192,29 @@ public class Scratch extends Sprite {
 
 	protected function initialize():void {
 
-		userName = loaderInfo.parameters["username"];
-		projectname = loaderInfo.parameters["project_name"];
-        projectId = loaderInfo.parameters["project_id"];
-        projectUrl = loaderInfo.parameters["project_url"];
-        editMode = (loaderInfo.parameters["editMode"] == "true");
-        autostart = (loaderInfo.parameters["autostart"] == "true");
+        this.isMine = loaderInfo.parameters["isMine"] == "true";
+        this.isPublish = loaderInfo.parameters["isPublish"] == "true";
+        this.isLogin = loaderInfo.parameters["isLogin"] == "true";
+        this.userName = loaderInfo.parameters["userName"];
+        this.projectname = loaderInfo.parameters["projectName"];
+        this.projectId = loaderInfo.parameters["projectId"];
+        projectKd = loaderInfo.parameters["projectKd"];
+        this.editMode = loaderInfo.parameters["editMode"] == "true";
+        this.projectUrl = loaderInfo.parameters["projectUrl"];
+		tokenKey = loaderInfo.parameters['token_key'];
+        isSplit = loaderInfo.parameters["isSplit"] == "true";
+        uploadServer = loaderInfo.parameters["uploadServer"] ;
+		fromType = loaderInfo.parameters["fromType"] ;
 
+        this.autostart = loaderInfo.parameters["autostart"] == "true";
+        this.modifiable = loaderInfo.parameters["modifiable"] == "true";
+		isLogin = (loaderInfo.parameters['isLogin'] == 'true');
+		isOffline = !URLUtil.isHttpURL(loaderInfo.url);
+		hostProtocol = URLUtil.getProtocol(loaderInfo.url);
 
-        isOffline = !URLUtil.isHttpURL(loaderInfo.url);
-        isOffline = true;
-        hostProtocol = URLUtil.getProtocol(loaderInfo.url);
-        isExtensionDevMode = (loaderInfo.parameters['extensionDevMode'] == 'true');
-        isMicroworld = (loaderInfo.parameters['microworldMode'] == 'true');
-		trackEvent(loaderInfo.url);
+		isExtensionDevMode = (loaderInfo.parameters['extensionDevMode'] == 'true');
+		isMicroworld = (loaderInfo.parameters['microworldMode'] == 'true');
+
 		checkFlashVersion();
 		initServer();
 
@@ -276,7 +243,7 @@ public class Scratch extends Sprite {
 		addParts();
 
 		server.getSelectedLang(Translator.setLanguageValue);
-		
+
 
 		stage.addEventListener(MouseEvent.MOUSE_DOWN, gh.mouseDown);
 		stage.addEventListener(MouseEvent.MOUSE_MOVE, gh.mouseMove);
@@ -292,34 +259,64 @@ public class Scratch extends Sprite {
 		setEditMode(startInEditMode());
 
 		// install project before calling fixLayout()
-//		if (editMode) runtime.installNewProject();
-//		else runtime.installEmptyProject();
-//        projectUrl = app.server.getProjectUrl();
-        if(projectUrl){
-            loadProjectFromURL(projectUrl,projectname);
-        }else{
-            if(editMode){
-                runtime.installNewProject();
-            }else{
-                runtime.installEmptyProject();
+        if(this.projectUrl != "")
+        {
+            if(!this.loadLocalProject()){
+                loadProjectFromURL(this.projectUrl,this.projectname);
             }
         }
+        else if(!this.loadLocalProject())
+        {
+            if(this.editMode){
+                this.runtime.installNewProject();
+            }
+            else{
+                this.runtime.installEmptyProject();
+            }
+        }
+
+
 		fixLayout();
 		//Analyze.collectAssets(0, 119110);
 		//Analyze.checkProjects(56086, 64220);
 		//Analyze.countMissingAssets();
+
 		handleStartupParameters();
 	}
+
+
+    public function loadLocalProject() : Boolean
+    {
+        var _loc1_:* = undefined;
+        try
+        {
+            app.sharedObject = SharedObject.getLocal("Scratch");
+            _loc1_ = app.sharedObject;
+            if((_loc1_.data.useProjectCache) && _loc1_.data.projectData)
+            {
+                this.runtime.installProjectFromData(_loc1_.data.projectData);
+//                app.isSplit = false;
+                this.setProjectName(_loc1_.data.projectName);
+                this.setSaveNeeded(true);
+                this.setUseProjectCache(false);
+                _loc1_.data.projectData = null;
+                _loc1_.data.projectName = "";
+                _loc1_.flush();
+
+                return true;
+            }
+
+            return false;
+        }
+        catch(error:Error)
+        {
+        }
+        return false;
+    }
 
 	protected function handleStartupParameters():void {
 		setupExternalInterface(false);
 		jsEditorReady();
-		//linm 通过loadProjectFromURL 加载sb2  这边就不需要了
-		//设置作品名称
-		//app.setProjectName(loaderInfo.parameters['default_title']);
-		//加载作品
-		//loadSingleGithubURL(loaderInfo.parameters['default_project']);
-
 	}
 
 	protected function setupExternalInterface(oldWebsitePlayer:Boolean):void {
@@ -330,8 +327,20 @@ public class Scratch extends Sprite {
 		addExternalCallback('ASextensionReporterDone', extensionManager.reporterCompleted);
 		addExternalCallback('AScreateNewProject', createNewProjectScratchX);
 
-        addExternalCallback("ASsaveProjectToServer",uploadProject);
-        addExternalCallback("ASremixProject",remixProject);
+
+        addExternalCallback("ASsetEditMode",setEditMode);
+        addExternalCallback("ASsaveProjectToServer",saveProjectToServer);
+        addExternalCallback("ASpublishProject",publishProject);
+        addExternalCallback("ASsetLogin",setLogin);
+		addExternalCallback("ASsetSaveStatus",topBarPart.refreshSaveStatus)
+//        addExternalCallback("ASsetLogin",setLogin);
+//        addExternalCallback("ASsetUseProjectCache",setUseProjectCache);
+//        addExternalCallback("ASsetSaveNeeded",setSaveNeeded);
+//        addExternalCallback("ASclearSaveNeeded",clearSaveNeeded);
+
+        addExternalCallback("ASsetTokenKey",setTokenKey);//设置tokenkey
+        addExternalCallback("ASsetProjectId",setProjectId);
+        addExternalCallback("ASsetProjectKd",setProjectKd);
 
 		if (isExtensionDevMode) {
 			addExternalCallback('ASloadGithubURL', loadGithubURL);
@@ -347,37 +356,46 @@ public class Scratch extends Sprite {
 			});
 		}
 	}
-    private function loadProjectFromURL(param1:String, param2:*):void{
+
+    private function loadProjectFromURL(param1:String, param2:*) : void
+    {
         var handleComplete:Function = null;
         var handleError:Function = null;
         var sb2Loader:URLLoader = null;
         var url:String = param1;
         var name:* = param2;
-        handleComplete = function(param1:Event):void{
+
+        handleComplete = function(param1:Event):void
+        {
             var _loc2_:String = null;
             var _loc3_:int = 0;
             runtime.installProjectFromData(sb2Loader.data);
-            if(StringUtil.trim(projectName()).length == 0){
+            if(StringUtil.trim(projectName()).length == 0)
+            {
                 _loc2_ = url;
                 _loc3_ = _loc2_.indexOf("?");
-                if(_loc3_ > 0){
+                if(_loc3_ > 0)
+                {
                     _loc2_ = _loc2_.slice(0,_loc3_);
                 }
                 _loc3_ = _loc2_.lastIndexOf("/");
-                if(_loc3_ > 0){
+                if(_loc3_ > 0)
+                {
                     _loc2_ = _loc2_.substr(_loc3_ + 1);
                 }
                 _loc3_ = _loc2_.lastIndexOf(".sb2");
-                if(_loc3_ > 0){
+                if(_loc3_ > 0)
+                {
                     _loc2_ = _loc2_.slice(0,_loc3_);
                 }
                 setProjectName(name);
             }
         };
-        handleError = function(param1:ErrorEvent):void{
+        handleError = function(param1:ErrorEvent):void
+        {
             jsThrowError("Failed to load project: " + param1.toString());
         };
-        loadInProgress = true;
+        this.loadInProgress = true;
         var request:URLRequest = new URLRequest(url);
         sb2Loader = new URLLoader(request);
         sb2Loader.dataFormat = URLLoaderDataFormat.BINARY;
@@ -395,7 +413,7 @@ public class Scratch extends Sprite {
 
 	private function loadSingleGithubURL(url:String):void {
 		url = StringUtil.trim(unescape(url));
-		
+
 		function handleComplete(e:Event):void {
 			runtime.installProjectFromData(sbxLoader.data);
 			if (StringUtil.trim(projectName()).length == 0) {
@@ -522,12 +540,12 @@ public class Scratch extends Sprite {
 	}
 
 	public function reopenTips():void {
-	} 
+	}
 
 	public function tipsWidth():int {
 		return 0;
 	}
-	//linm
+
 	protected function startInEditMode():Boolean {
 		return editMode;
 	}
@@ -862,6 +880,17 @@ public class Scratch extends Sprite {
 			}
 			externalCall('JSprojectLoaded');
 		}
+
+//        if(this.isSplit)
+//        {
+//            _loc2_ = new ProjectIO(this).encodeProjectAsZipFile(this.stagePane);
+//            this.saveForRevert(_loc2_,true);
+//        }
+        if(this.editMode && !this.isLogin)
+        {
+            this.checkFlashLocalStorage();
+        }
+        this.externalCall("projectLoaded");
 	}
 
 	public function resetPlugin(whenDone:Function):void {
@@ -875,6 +904,7 @@ public class Scratch extends Sprite {
 
 	protected function step(e:Event):void {
 		// Step the runtime system and all UI components.
+		CachedTimer.clearCachedTimer();
 		gh.step();
 		runtime.stepRuntime();
 		Transition.step(null);
@@ -1035,7 +1065,7 @@ public class Scratch extends Sprite {
 
 		w = Math.ceil(w / scaleX);
 		h = Math.ceil(h / scaleY);
-		
+
 		updateLayout(w, h);
 	}
 	
@@ -1112,10 +1142,6 @@ public class Scratch extends Sprite {
 		scriptsPart.setWidthHeight(contentW, contentH);
 
 		if (mediaLibrary) mediaLibrary.setWidthHeight(topBarPart.w, fullH);
-		if (frameRateGraph) {
-			frameRateGraph.y = stage.stageHeight - frameRateGraphH;
-			addChild(frameRateGraph); // put in front
-		}
 
 		SCRATCH::allow3d {
 			if (isIn3D) render3D.onStageResize();
@@ -1160,9 +1186,11 @@ public class Scratch extends Sprite {
 			}
 		}
 	}
-	//linm  logo  点击
+
 	public function logoButtonPressed(b:IconButton):void {
-        externalCall("toHomePage",null,app.saveNeeded);
+		if (isExtensionDevMode) {
+			externalCall('showPage', null, 'home');
+		}
 	}
 
 	// -----------------------------
@@ -1192,48 +1220,14 @@ public class Scratch extends Sprite {
 	// -----------------------------
 	// Menus
 	//------------------------------
-
-	//linm 显示个人用户菜单
-	//----------start UserMenu------
-    public function showUserMenu(param1:*) : void
-    {
-        //externalCall("showUserMenu",null);
-        var m:Menu = new Menu(null,"User",CSS.topBarColor(),28);
-        m.addItem("Project/Gallery",linkToProject);
-        m.addItem("Personal",linkToPersonal);
-        m.addItem("Setting",linkToSetting);
-        var _loc3_:Point = param1.localToGlobal(new Point(0,0));
-        m.showOnStage(stage,param1.x,this.topBarPart.bottom() - 1);
-    }
-
-    protected function linkToProject() : void{
-        this.externalCall("linkToProject",null,app.saveNeeded);
-    }
-
-    protected function linkToPersonal() : void{
-        this.externalCall("linkToPersonal",null,app.saveNeeded);
-    }
-
-    protected function linkToSetting() : void
-    {
-        this.externalCall("linkToSetting",null,app.saveNeeded);
-    }
-
-    protected function linkToFeedback() : void
-    {
-        this.externalCall("linkToFeedback",null,app.saveNeeded);
-    }
-	//---------end UserMenu---------
-
-
 	public function showFileMenu(b:*):void {
 		var m:Menu = new Menu(null, 'File', CSS.topBarColor(), 28);
 		m.addItem('New', createNewProject);
 		m.addLine();
-		
+
 		// Derived class will handle this
 		addFileMenuItems(b, m);
-		
+
 		m.showOnStage(stage, b.x, topBarPart.bottom() - 1);
 	}
 	
@@ -1244,8 +1238,6 @@ public class Scratch extends Sprite {
 	protected function addFileMenuItems(b:*, m:Menu):void {
 		m.addItem('Load Project', runtime.selectProjectFile);
 		m.addItem('Save Project', exportProjectToFile);
-//		m.addItem('保存到小码王', saveProject);
-//		m.addItem('保存并发布', saveProject);
 //		if (runtime.recording || runtime.ready==ReadyLabel.COUNTDOWN || runtime.ready==ReadyLabel.READY) {
 //			m.addItem('Stop Video', runtime.stopVideo);
 //		} else {
@@ -1288,10 +1280,48 @@ public class Scratch extends Sprite {
 		m.addLine();
 		m.addItem('Small stage layout', toggleSmallStage, true, stageIsContracted);
 		m.addItem('Turbo mode', toggleTurboMode, true, interp.turboMode);
-		addEditMenuItems(b, m);
+		//addEditMenuItems(b, m);
 		var p:Point = b.localToGlobal(new Point(0, 0));
 		m.showOnStage(stage, b.x, topBarPart.bottom() - 1);
 	}
+	//linm 显示菜单
+    public function showUserMenu(param1:*) : void
+    {
+        this.externalCall("showUserMenu",null);
+        var _loc2_:Menu = new Menu(null,"User",CSS.topBarColor(),28);
+        _loc2_.addItem("Project/Gallery",this.linkToProject);
+        _loc2_.addItem("Personal",this.linkToPersonal);
+        _loc2_.addItem("Setting",this.linkToSetting);
+        _loc2_.addLine();
+        //_loc2_.addItem("Logout",this.logout);
+        var _loc3_:Point = param1.localToGlobal(new Point(0,0));
+        _loc2_.showOnStage(stage,param1.x,this.topBarPart.bottom() - 1);
+    }
+
+    protected function linkToProject() : void
+    {
+        this.externalCall("linkToProject",null,app.saveNeeded);
+    }
+
+    protected function linkToPersonal() : void
+    {
+        this.externalCall("linkToPersonal",null,app.saveNeeded);
+    }
+
+    protected function linkToSetting() : void
+    {
+        this.externalCall("linkToSetting",null,app.saveNeeded);
+    }
+
+    protected function linkToFeedback() : void
+    {
+        this.externalCall("linkToFeedback",null,app.saveNeeded);
+    }
+
+    protected function logout() : void
+    {
+        this.externalCall("logout",null,app.saveNeeded);
+    }
 
 	protected function addEditMenuItems(b:*, m:Menu):void {
 		m.addLine();
@@ -1318,15 +1348,17 @@ public class Scratch extends Sprite {
 				'\n\nPlease do not distribute!', stage);
 	}
 
+	protected function onNewProject():void {}
+
 	protected function createNewProjectAndThen(callback:Function = null):void {
 		function clearProject():void {
 			startNewProject('', '');
 			setProjectName('Untitled');
+			onNewProject();
 			topBarPart.refresh();
 			stagePart.refresh();
 			if (callback != null) callback();
 		}
-
 		saveProjectAndThen(clearProject);
 	}
 
@@ -1372,113 +1404,7 @@ public class Scratch extends Sprite {
 		d.showOnStage(stage);
 	}
 
-
-	//linm保存个人作品到服务端
-//	public function saveProject():void {
-//		trackEvent('保存作品');
-//	}
-//
-//	public function saveProjectAndPublish():void {
-//        trackEvent('发布作品');
-//	}
-
-	public function uploadProject(callBackFunc:String):void{
-        trackEvent("点击保存");
-        postToServer('false',callBackFunc);
-	}
-
-    public function remixProject(callBackFunc:String) : void{
-        trackEvent("点击发布");
-        postToServer('true',callBackFunc);
-    }
-
-	public function postToServer(Publish:String,callBakcFunc:String):void{
-
-        var upload_server:String = loaderInfo.parameters['upload_server'];
-        if (upload_server == null ){
-            ExternalInterface.call.apply(ExternalInterface, ['function(){alert("服务端错误")}']);
-        }
-
-        //得到 sb2内容
-        var projIO:ProjectIO = new ProjectIO(this);
-        var zipData:ByteArray = projIO.encodeProjectAsZipFile(stagePane);
-        //截图
-        var jpgstream:ByteArray  = stagePane.projectThumbnailPNG();
-        //post data
-
-		if (Publish == 'true') {
-            loaderInfo.parameters['ispublish'] = true;
-		} else{
-            loaderInfo.parameters['ispublish'] = false;
-		}
-
-        loaderInfo.parameters['project_name'] = projectName();
-//        var postdata:String = util.JSON.stringify(loaderInfo.parameters) ;
-        var token_key = loaderInfo.parameters['token_key'] || '';
-        var compose_type = loaderInfo.parameters['compose_type'] || '';
-        var lesson_id = loaderInfo.parameters['lesson_id'] || '';
-        var postdata:Object = {
-            "project_id":projectId,
-            "project_name":projectname,
-			"project_url":projectUrl,
-			"token_key":token_key,
-			"compose_type":compose_type,
-			"lesson_id":lesson_id
-		} ;
-        //创建一个 上传对象
-        var uploadPostHelper:* = new UploadPostHelper2(upload_server);
-        // 添加sb2文件
-        uploadPostHelper.addFile("sb2file.sb2","sb2file",zipData);
-        //添加sb2 封面图片
-        uploadPostHelper.addFile('sb2img.png',"imgfile",jpgstream);
-        uploadPostHelper.addParameter('postdata',util.JSON.stringify(postdata));
-
-        uploadPostHelper.addParameter('token_key',token_key);
-
-		var callback:String = callBakcFunc;
-		//保存成功 返回处理
-        function uploadComplete(evt:Event):void {
-			if(evt.target.data) {
-				var retData:* = evt.target.data;
-                var responseData:* =  util.JSON.parse(String(retData));
-
-                if (responseData  & responseData.list && responseData.list.project_id ) {
-                    var resultProjectName = responseData.list.project_name
-                    trackEvent("保存成功-" + resultProjectName);
-                    setProjectName(resultProjectName);
-                    if(!projectId) {
-                        projectId = responseData.list.project_id;
-                    }
-
-                    topBarPart.refresh();
-                    topBarPart.refreshSaveStatus("Saved");
-                }else{
-                    externalCall("saveProjectFailed",null,"");
-                    topBarPart.refreshSaveStatus("Unsaved");
-                    externalCall("notify",null,responseData.message,"错误","知道了");
-                    originalProj = null;
-                }
-                ExternalInterface.call.apply(ExternalInterface, [callback,evt.target.data]);
-			}
-
-        }
-
-        function errorHandler():void{
-            ExternalInterface.call.apply(ExternalInterface, ['function(){alert("上传失败")}']);
-        }
-        var jpgURLRequest:URLRequest = uploadPostHelper.getUrlRequest();
-        var loader:URLLoader = new URLLoader();
-        loader.addEventListener(Event.COMPLETE, uploadComplete);
-        loader.addEventListener(IOErrorEvent.IO_ERROR, errorHandler);
-        loader.load(jpgURLRequest);
-	}
-	//js 交互
-    public function trackEvent(param1:String):void{
-        externalCall("trackEvent",null,param1);
-    }
-
-
-    public function exportProjectToFile(fromJS:Boolean = false, saveCallback:Function = null):void {
+	public function exportProjectToFile(fromJS:Boolean = false, saveCallback:Function = null):void {
 		function squeakSoundsConverted():void {
 			scriptsPane.saveScripts(false);
 			var projectType:String = extensionManager.hasExperimentalExtensions() ? '.sbx' : '.sb2';
@@ -1515,6 +1441,118 @@ public class Scratch extends Sprite {
 		}
 		return result;
 	}
+	//上传sb2 截图
+    public function uploadProject(projectUploadedFailed:String, projectSavedCallback:String) : * {
+        function squeakSoundsConverted():void {
+
+            function progressHandler(evt:ProgressEvent){
+                if(!this.lp){addLoadProgressBox("Uploading project...");}
+                lp.setProgress(evt.bytesLoaded / evt.bytesTotal);
+                lp.setInfo(evt.bytesLoaded + "/ " + evt.bytesTotal);
+            }
+            //保存成功 返回处理
+            function uploadComplete(evt:Event):void {
+                removeLoadProgressBox();
+                loadInProgress = false;
+                clearSaveNeeded();
+                if(evt.target.data) {
+					var retData:String = evt.target.data;
+                    var responseData:* =  util.JSON.parse(retData);
+                    if (responseData  && responseData.result ) {
+						if(responseData.result.project_id) {
+                            projectId = responseData.result.project_id;
+						}
+                        if(responseData.result.project_kd) {
+                            projectKd = responseData.result.project_kd;
+                        }
+                        if(responseData.result.project_name) {
+                            trackEvent("保存成功-" + responseData.result.project_name);
+                            setProjectName(responseData.result.project_name);
+                        }
+                        originalProj = null;
+                    }else{
+                        topBarPart.refreshSaveStatus("Unsaved");
+                        externalCall("notify",null,responseData.message,"错误","知道了");
+                        originalProj = null;
+                    }
+                    if(projectSavedCallback){
+                        externalCall(projectSavedCallback,null,retData);
+                    }
+
+                }
+            }
+
+            function errorHandler():void{
+                removeLoadProgressBox();
+                loadInProgress = false;
+                clearSaveNeeded();
+				externalCall("saveProjectFailed",null,"");
+			}
+
+			setSaveNeeded(true);
+            topBarPart.hideTipLabel();
+            topBarPart.refreshSaveStatus("Saving...");
+
+			//获取sb2文件
+            var zipData:ByteArray = projIO.encodeProjectAsZipFile(stagePane);
+            originalProj = zipData;
+            //截图
+            var jpgstream:ByteArray  = stagePane.projectThumbnailPNG();
+			var projectTitle = projectName() ? projectName(): '';
+            var postdata:Object = {
+                "project_id":(projectId ? projectId : '' ),
+				"project_kd":(projectKd ? projectKd : '' ),
+                "project_name":projectTitle,
+                "project_url":projectUrl
+            };
+			var params = loaderInfo.parameters['params'] ? loaderInfo.parameters['params'] : '';
+
+            //创建一个 上传对象
+            var uploadPostHelper:* = new UploadPostHelper2(uploadServer);
+            // 添加sb2文件
+            uploadPostHelper.addFile("sb2file.sb2","sb2file",zipData);
+            //添加sb2 封面图片
+            uploadPostHelper.addFile('sb2img.png',"imgfile",jpgstream);
+
+            uploadPostHelper.addParameter('postdata',util.JSON.stringify(postdata));
+            uploadPostHelper.addParameter('params',params);
+            uploadPostHelper.addParameter('token_key',tokenKey?tokenKey:'');
+
+            var uploadURLRequest:URLRequest = uploadPostHelper.getUrlRequest();
+            var loader:URLLoader = new URLLoader();
+            loader.addEventListener(ProgressEvent.PROGRESS,progressHandler);
+            loader.addEventListener(Event.COMPLETE, uploadComplete);
+            loader.addEventListener(IOErrorEvent.IO_ERROR, errorHandler);
+            addLoadProgressBox("Loading project...");
+            loadInProgress = true;
+            loader.load(uploadURLRequest);
+        }
+
+        if (!this.isLogin) {app.login(); return; }
+
+        if (!this.checkProjectSize()) {return;}
+
+        var defaultName:String = StringUtil.trim(this.projectName());
+        if (!this.checkProjectName(defaultName, true)) {return;}
+
+        if (this.loadInProgress) {return;}
+
+        if (!uploadServer){externalCall('uploadurlErr',null,'上传服务端地址必填');}
+        var projIO:ProjectIO = new ProjectIO(this);
+		projIO.convertSqueakSounds(stagePane,squeakSoundsConverted);
+
+    }
+
+    public function saveProjectToServer(formjs:Boolean,callBakcFunc:String):void{
+        trackEvent("点击保存");
+        uploadProject('saveProjectFailed',callBakcFunc);
+    }
+
+	public function publishProject(formjs:Boolean,callBakcFunc:String):void{
+        trackEvent("点击发布");
+        uploadProject('saveProjectFailed',callBakcFunc);
+	}
+
 
 	public function saveSummary():void {
 		var name:String = (projectName() || "project") + ".txt";
@@ -1565,6 +1603,7 @@ public class Scratch extends Sprite {
 			Translator.setLanguage(lang);
 			languageChanged = true;
 		}
+
 		if (Translator.languages.length == 0) return; // empty language list
 		var m:Menu = new Menu(setLanguage, 'Language', CSS.topBarColor(), 28);
 		if (b.lastEvent.shiftKey) {
@@ -1577,19 +1616,137 @@ public class Scratch extends Sprite {
 		}
 		var p:Point = b.localToGlobal(new Point(0, 0));
 		m.showOnStage(stage, b.x, topBarPart.bottom() - 1);
-		
 	}
 
 	public function startNewProject(newOwner:String, newID:String):void {
 		runtime.installNewProject();
 		projectOwner = newOwner;
-		projectID = newID;
+		projectID 	= newID;
 		projectIsPrivate = true;
 	}
+
+    public function checkFlashLocalStorage() : *
+    {
+        var sharedObj:SharedObject = null;
+        var flushStatus:String = null;
+        try
+        {
+            sharedObj = app.sharedObject;
+            sharedObj.data.checkData = "checkData";
+            flushStatus = null;
+            flushStatus = sharedObj.flush();
+            return;
+        }
+        catch(error:Error)
+        {
+            notifyStorageError();
+            return;
+        }
+    }
+
+	//linm 登录
+    public function login() : *{
+        var projIO:ProjectIO = null;
+        var data:ByteArray = null;
+        var sharedObj:SharedObject = null;
+        var flushStatus:String = null;
+        try{
+            projIO = new ProjectIO(this);
+            data = projIO.encodeProjectAsZipFile(this.stagePane);
+            sharedObj = app.sharedObject;
+            sharedObj.data.projectData = data;
+            sharedObj.data.projectName = StringUtil.trim(this.projectName());
+            flushStatus = sharedObj.flush(data.length);
+        }catch(error:Error)
+        {
+            externalCall("login");
+            notifyStorageError();
+        }
+        if(flushStatus != null)
+        {
+            switch(flushStatus)
+            {
+                case SharedObjectFlushStatus.PENDING:
+                    sharedObj.addEventListener(NetStatusEvent.NET_STATUS,this.onFlushStatus);
+                    break;
+                case SharedObjectFlushStatus.FLUSHED:
+                    this.externalCall("login");
+            }
+        }
+    }
+
+    public function setLogin(param1:Boolean) : *{
+        isLogin = param1;
+        topBarPart.refreshButtons();
+    }
+
+    private function onFlushStatus(param1:NetStatusEvent) : void
+    {
+        var _loc2_:SharedObject = app.sharedObject;
+        switch(param1.info.code)
+        {
+            case "SharedObject.Flush.Success":
+                this.externalCall("login");
+                break;
+            case "SharedObject.Flush.Failed":
+                this.notifyStorageError();
+                this.externalCall("login");
+        }
+        _loc2_.removeEventListener(NetStatusEvent.NET_STATUS,this.onFlushStatus);
+    }
+
+    public function notifyStorageError() : *{
+        DialogBox.notify(Translator.map("Notify"),Translator.map("You have refused to store the local file in the flash settings manager, and your creations will not be saved!"),stage);
+    }
+	//设置缓存
+    public function setUseProjectCache(param1:Boolean) : *
+    {
+        var _loc2_:SharedObject = app.sharedObject;
+        _loc2_.data.useProjectCache = param1;
+        var _loc3_:String = null;
+        try
+        {
+            _loc3_ = _loc2_.flush();
+            return;
+        }
+        catch(error:Error)
+        {
+            return;
+        }
+    }
+
+    public function getStringLength(param1:String) : int
+    {
+        param1 = param1 || "";
+        param1 = param1.replace(/^\n+|\n+$/g,"");
+        var _loc2_:* = param1.length;
+        var _loc3_:* = 0;
+        var _loc4_:* = param1.match(/[^\x00-\x80]/g);
+        if(!!_loc4_ && _loc4_.length > 0)
+        {
+            _loc3_ = _loc4_.length || 0;
+        }
+        return _loc2_ + _loc3_;
+    }
+
+    public function checkProjectName(param1:String, param2:Boolean) : *
+    {
+        if(this.getStringLength(param1) > 48)
+        {
+            if(param2)
+            {
+                this.externalCall("notify",null,"输入不超过24个字","作品名称过长","知道了");
+            }
+            return false;
+        }
+        return true;
+    }
 
 	// -----------------------------
 	// Save status
 	//------------------------------
+
+	public var saveNeeded:Boolean;
 
 	public function setSaveNeeded(saveNow:Boolean = false):void {
 		saveNow = false;
@@ -1609,6 +1766,17 @@ public class Scratch extends Sprite {
 		wasEdited = true;
 	}
 
+	public function setTokenKey(newtokenKey:String):void{
+		tokenKey = newtokenKey
+	}
+
+	public function setProjectId(newId:String):void{
+		projectId = int(newId);
+	}
+
+	public function setProjectKd(newKd:String):void{
+		projectKd = newKd;
+	}
 	// -----------------------------
 	// Project Reverting
 	//------------------------------
@@ -1698,6 +1866,34 @@ public class Scratch extends Sprite {
 		if (targetObj == viewedObj()) setTab('images');
 	}
 
+	//校验sb2文件大小 50m以上不许上传
+    public function checkProjectSize() : Boolean{
+        var _loc3_:ScratchObj = null;
+        var _loc4_:ScratchCostume = null;
+        var _loc5_:ScratchSound = null;
+        var _loc6_:int = 0;
+        var _loc1_:int = 50 * 1024 * 1024;
+        var _loc2_:int = 0;
+        for each(_loc3_ in this.stagePane.allObjects()){
+            for each(_loc4_ in _loc3_.costumes){
+                if(!_loc4_.baseLayerData){
+                    _loc4_.prepareToSave();
+                }
+                _loc2_ = _loc2_ + _loc4_.baseLayerData.length;
+            }
+            for each(_loc5_ in _loc3_.sounds){
+                _loc2_ = _loc2_ + _loc5_.soundData.length;
+            }
+        }
+        app.assetByteCount = _loc2_;
+        if(_loc2_ > _loc1_){
+            _loc6_ = Math.max(1,(_loc2_ - _loc1_) / 1024);
+            DialogBox.notify(Translator.map("Notify"),Translator.map("The size of project should be within 50MB, Please remove some costumes, backdrops, or sounds first"),stage);
+            return false;
+        }
+        return true;
+    }
+
 	public function okayToAdd(newAssetBytes:int):Boolean {
 		// Return true if there is room to add an asset of the given size.
 		// Otherwise, return false and display a warning dialog.
@@ -1775,76 +1971,6 @@ public class Scratch extends Sprite {
 	}
 
 	// -----------------------------
-	// Frame rate readout (for use during development)
-	//------------------------------
-
-	private var frameRateReadout:TextField;
-	private var firstFrameTime:int;
-	private var frameCount:int;
-
-	protected function addFrameRateReadout(x:int, y:int, color:uint = 0):void {
-		frameRateReadout = new TextField();
-		frameRateReadout.autoSize = TextFieldAutoSize.LEFT;
-		frameRateReadout.selectable = false;
-		frameRateReadout.background = false;
-		frameRateReadout.defaultTextFormat = new TextFormat(CSS.font, 12, color);
-		frameRateReadout.x = x;
-		frameRateReadout.y = y;
-		addChild(frameRateReadout);
-		frameRateReadout.addEventListener(Event.ENTER_FRAME, updateFrameRate);
-	}
-
-	private function updateFrameRate(e:Event):void {
-		frameCount++;
-		if (!frameRateReadout) return;
-		var now:int = getTimer();
-		var msecs:int = now - firstFrameTime;
-		if (msecs > 500) {
-			var fps:Number = Math.round((1000 * frameCount) / msecs);
-			frameRateReadout.text = fps + ' fps (' + Math.round(msecs / frameCount) + ' msecs)';
-			firstFrameTime = now;
-			frameCount = 0;
-		}
-	}
-
-	// TODO: Remove / no longer used
-	private const frameRateGraphH:int = 150;
-	private var frameRateGraph:Shape;
-	private var nextFrameRateX:int;
-	private var lastFrameTime:int;
-
-	private function addFrameRateGraph():void {
-		addChild(frameRateGraph = new Shape());
-		frameRateGraph.y = stage.stageHeight - frameRateGraphH;
-		clearFrameRateGraph();
-		stage.addEventListener(Event.ENTER_FRAME, updateFrameRateGraph);
-	}
-
-	public function clearFrameRateGraph():void {
-		var g:Graphics = frameRateGraph.graphics;
-		g.clear();
-		g.beginFill(0xFFFFFF);
-		g.drawRect(0, 0, stage.stageWidth, frameRateGraphH);
-		nextFrameRateX = 0;
-	}
-
-	private function updateFrameRateGraph(evt:*):void {
-		var now:int = getTimer();
-		var msecs:int = now - lastFrameTime;
-		lastFrameTime = now;
-		var c:int = 0x505050;
-		if (msecs > 40) c = 0xE0E020;
-		if (msecs > 50) c = 0xA02020;
-
-		if (nextFrameRateX > stage.stageWidth) clearFrameRateGraph();
-		var g:Graphics = frameRateGraph.graphics;
-		g.beginFill(c);
-		var barH:int = Math.min(frameRateGraphH, msecs / 2);
-		g.drawRect(nextFrameRateX, frameRateGraphH - barH, 1, barH);
-		nextFrameRateX++;
-	}
-
-	// -----------------------------
 	// Camera Dialog
 	//------------------------------
 
@@ -1894,14 +2020,10 @@ public class Scratch extends Sprite {
 	public function externalInterfaceAvailable():Boolean {
 		return ExternalInterface.available;
 	}
-	
-	
-	//	指定函数将接受任意多个以逗号分隔的参数。参数列表成为了在整个函数体中可用的数组。在参数声明中，数组的名称在 ... 字符后指定。参数可以拥有保留字以外的任意名称。
-	//	如果与其它参数共同使用，则 ...（其余的）参数声明必须是最后指定的参数。只有传递给函数的参数数目超过其它参数的数目时，才会填充 ...（其余的）参数数组。
-	//	逗号分隔参数列表中的每一个参数都将放置在该数组的一个元素中。如果您传递了 Array 类的实例，则整个数组会放置到 ...（其余的）参数数组的单个元素中。
+
 	public function externalCall(functionName:String, returnValueCallback:Function = null, ...args):void {
 		args.unshift(functionName);
-		var retVal:*;//声明了一个任意类型的变量
+		var retVal:*;
 		try {
 			retVal = ExternalInterface.call.apply(ExternalInterface, args);
 		}

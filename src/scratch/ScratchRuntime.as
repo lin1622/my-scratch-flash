@@ -26,8 +26,6 @@ import assets.Resources;
 import blocks.Block;
 import blocks.BlockArg;
 
-import com.adobe.utils.StringUtil;
-
 import extensions.ExtensionManager;
 
 import flash.display.*;
@@ -67,10 +65,18 @@ import watchers.*;
 
 public class ScratchRuntime {
 
+	// Scratch uses these pseudo-Unicode values to map arrow keys as if they were printable characters.
+	// Changing these values may break compatibility with existing projects using "hacked" keypress blocks.
+	private static const SCRATCH_ARROW_LEFT:int = 28; // file separator
+	private static const SCRATCH_ARROW_RIGHT:int = 29; // record separator
+	private static const SCRATCH_ARROW_UP:int = 30; // group separator
+	private static const SCRATCH_ARROW_DOWN:int = 31; // unit separator
+
 	public var app:Scratch;
 	public var interp:Interpreter;
 	public var motionDetector:VideoMotionPrims;
 	public var keyIsDown:Array = []; // sparse array recording key up/down state
+	public var shiftIsDown:Boolean;
 	public var lastAnswer:String = '';
 	public var cloneCount:int;
 	public var edgeTriggersEnabled:Boolean = false; // initially false, becomes true when project first run
@@ -94,7 +100,7 @@ public class ScratchRuntime {
 	//------------------------------
 
 	public function stepRuntime():void {
-		if (projectToInstall != null && (app.isOffline || app.isExtensionDevMode)) {
+		if (projectToInstall != null) {
 			installProject(projectToInstall);
 			if (saveAfterInstall) app.setSaveNeeded(true);
 			projectToInstall = null;
@@ -102,7 +108,7 @@ public class ScratchRuntime {
 			return;
 		}
 		if (ready==ReadyLabel.COUNTDOWN) {
-			var tR:Number = getTimer()*.001-videoSeconds;
+			var tR:Number = CachedTimer.getCachedTimer()*.001-videoSeconds;
 			while (t>videoSounds.length/videoFramerate+1/videoFramerate) {
 				saveSound();
 			}
@@ -129,7 +135,7 @@ public class ScratchRuntime {
 			}
 		}
 		if (recording) { // Recording a YouTube video?
-			var t:Number = getTimer()*.001-videoSeconds;
+			var t:Number = CachedTimer.getCachedTimer()*.001-videoSeconds;
 			//If, based on time and framerate, the current frame needs to be in the video, capture the frame.
 			//Will always be true if framerate is 30, as every frame is captured.
 			if (t>videoSounds.length/videoFramerate+1/videoFramerate) {
@@ -173,7 +179,7 @@ public class ScratchRuntime {
 		processEdgeTriggeredHats();
 		interp.stepThreads();
 		app.stagePane.commitPenStrokes();
-		
+
 		if (ready==ReadyLabel.COUNTDOWN || ready==ReadyLabel.READY) {
 			app.stagePane.countdown(count);
 		}
@@ -188,7 +194,7 @@ public class ScratchRuntime {
 	private var videoPosition:int;
 	private var videoSeconds:Number;
 	private var videoAlreadyDone:int;
-	
+
 	private var projectSound:Boolean;
 	private var micSound:Boolean;
 	private var showCursor:Boolean;
@@ -197,17 +203,17 @@ public class ScratchRuntime {
 	private var videoWidth:int;
 	private var videoHeight:int;
 	public var ready:int=ReadyLabel.NOT_READY;
-	
+
 	private var micBytes:ByteArray;
 	private var micPosition:int = 0;
 	private var mic:Microphone;
 	private var micReady:Boolean;
-	
+
 	private var timeout:int;
-	
+
 	private function saveFrame():void {
 		saveSound();
-		var t:Number = getTimer()*.001-videoSeconds;
+		var t:Number = CachedTimer.getCachedTimer()*.001-videoSeconds;
 		while (t>videoSounds.length/videoFramerate+1/videoFramerate) {
 			saveSound();
 		}
@@ -283,7 +289,7 @@ public class ScratchRuntime {
 			videoFrames.push(f);
 		}
 	}
-	
+
 	private function saveSound():void {
 		var floats:Array = [];
 		if (micSound && micBytes.length>0) {
@@ -324,17 +330,17 @@ public class ScratchRuntime {
 		videoSounds.push(combinedStream);
 		combinedStream = null;
 	}
-	
-	private function micSampleDataHandler(event:SampleDataEvent):void 
-	{ 
-	    while(event.data.bytesAvailable) 
+
+	private function micSampleDataHandler(event:SampleDataEvent):void
+	{
+	    while(event.data.bytesAvailable)
 	    {
-	        var sample:Number = event.data.readFloat(); 
-	        micBytes.writeFloat(sample);  
+	        var sample:Number = event.data.readFloat();
 	        micBytes.writeFloat(sample);
-	    } 
-	} 
-	
+	        micBytes.writeFloat(sample);
+	    }
+	}
+
 	public function startVideo(editor:RecordingSpecEditor):void {
 		projectSound = editor.soundFlag();
 		micSound = editor.microphoneFlag();
@@ -346,10 +352,10 @@ public class ScratchRuntime {
 		}
 		micReady = true;
 		if (micSound) {
-			mic = Microphone.getMicrophone(); 
+			mic = Microphone.getMicrophone();
 			mic.setSilenceLevel(0);
-			mic.gain = editor.getMicVolume(); 
-			mic.rate = 44; 
+			mic.gain = editor.getMicVolume();
+			mic.rate = 44;
 			micReady=false;
 		}
 		if (fullEditor) {
@@ -374,14 +380,14 @@ public class ScratchRuntime {
 			videoHeight = 360;
 		}
 		ready=ReadyLabel.COUNTDOWN;
-		videoSeconds = getTimer()*.001;
+		videoSeconds = CachedTimer.getCachedTimer()*.001;
 		baFlvEncoder = new ByteArrayFlvEncoder(videoFramerate);
 		baFlvEncoder.setVideoProperties(videoWidth, videoHeight);
 		baFlvEncoder.setAudioProperties(FlvEncoder.SAMPLERATE_44KHZ, true, true, true);
 		baFlvEncoder.start();
 		waitAndStart();
 	}
-	
+
 	public function exportToVideo():void {
 		var specEditor:RecordingSpecEditor = new RecordingSpecEditor();
 		function startCountdown():void {
@@ -389,7 +395,7 @@ public class ScratchRuntime {
 		}
 		DialogBox.close("Record Project Video",null,specEditor,"Start",app.stage,startCountdown);
 	}
-	
+
 	public function stopVideo():void {
 		if (recording) videoTimer.dispatchEvent(new TimerEvent(TimerEvent.TIMER));
 		else if (ready==ReadyLabel.COUNTDOWN || ReadyLabel.READY) {
@@ -398,7 +404,7 @@ public class ScratchRuntime {
 			app.stagePane.countdown(0);
 		}
 	}
-	
+
 	public function finishVideoExport(event:TimerEvent):void {
 		stopRecording();
 		stopAll();
@@ -407,7 +413,7 @@ public class ScratchRuntime {
 		clearTimeout(timeout);
 		timeout = setTimeout(saveRecording,1);
 	}
-	
+
 	public function waitAndStart():void {
 		if (!micReady && !mic.hasEventListener(StatusEvent.STATUS)) {
 			micBytes = new ByteArray();
@@ -427,7 +433,7 @@ public class ScratchRuntime {
 		ready=ReadyLabel.NOT_READY;
 		app.refreshStagePart();
 		var player:ScratchSoundPlayer, length:int;
-		videoSeconds = getTimer() * 0.001;
+		videoSeconds = CachedTimer.getCachedTimer() * 0.001;
 		for each (player in ScratchSoundPlayer.activeSounds) {
 			length = int((player.soundChannel.position*.001)*videoFramerate);
 			player.readPosition = Math.max(Math.min(baFlvEncoder.audioFrameSize*length,player.dataBytes.length),0);
@@ -439,7 +445,7 @@ public class ScratchRuntime {
     	videoTimer.addEventListener(TimerEvent.TIMER, finishVideoExport);
     	videoTimer.start();
 	}
-	
+
 	public function stopRecording():void {
 		recording = false;
 		videoTimer.stop();
@@ -473,7 +479,7 @@ public class ScratchRuntime {
 				videoSounds[videoPosition]=null;
 				videoPosition++;
 			}
-			if (app.lp) app.lp.setProgress(Math.min((videoPosition-videoAlreadyDone) / (videoFrames.length-videoAlreadyDone), 1)); 
+			if (app.lp) app.lp.setProgress(Math.min((videoPosition-videoAlreadyDone) / (videoFrames.length-videoAlreadyDone), 1));
 			clearTimeout(timeout);
 			timeout = setTimeout(saveRecording, 1);
 			return;
@@ -506,7 +512,7 @@ public class ScratchRuntime {
 		}
 		DialogBox.close("Video Finished!","To save, click the button below.",null,"Save and Download",app.stage,saveFile,releaseVideo,null,true);
 	}
-	
+
 	private function roundToTens(x:Number):Number {
 		return int((x)*10)/10.;
 	}
@@ -558,16 +564,8 @@ public class ScratchRuntime {
 		}
 	}
 
-	public function startKeyHats(keyCode:int):void {
-		var keyName:String = null;
-		switch (keyCode) {
-			case Keyboard.LEFT: keyName = 'left arrow'; break;
-			case Keyboard.RIGHT: keyName = 'right arrow'; break;
-			case Keyboard.UP: keyName = 'up arrow'; break;
-			case Keyboard.DOWN: keyName = 'down arrow'; break;
-			case Keyboard.SPACE: keyName = 'space'; break;
-			default: keyName = String.fromCharCode(keyCode).toLowerCase(); break;
-		}
+	public function startKeyHats(ch:int):void {
+		var keyName:String = getKeyName(ch);
 		function startMatchingKeyHats(stack:Block, target:ScratchObj):void {
 			if (stack.op == 'whenKeyPressed') {
 				var k:String = stack.args[0].argValue;
@@ -813,6 +811,22 @@ public class ScratchRuntime {
 		app.setProjectName(fileName);
 	}
 
+    public function installJSONProjectFromData(param1:ByteArray, param2:Boolean = true) : void
+    {
+        this.stopAll();
+        param1.position = 0;
+        if(param1.length < 8 || param1.readUTFBytes(8) != "ScratchV")
+        {
+            param1.position = 0;
+//            new ProjectIO(this.app).decodeJSONProjectFromZipFile(param1);
+        }
+        if(param2)
+        {
+            this.app.saveForRevert(param1,false);
+        }
+        this.app.extensionManager.clearImportedExtensions();
+    }
+
 	public function installProjectFromData(data:ByteArray, saveForRevert:Boolean = true):void {
 		var newProject:ScratchStage;
 		stopAll();
@@ -846,12 +860,14 @@ public class ScratchRuntime {
 
 	public function projectLoadFailed(ignore:* = null):void {
 		app.removeLoadProgressBox();
-		//DialogBox.notify('Error!', 'Project did not load.', app.stage);
+		DialogBox.notify('Error!', 'Project did not load.', app.stage);
 		app.loadProjectFailed();
 	}
 
 	public function decodeImagesAndInstall(newProject:ScratchStage):void {
-		function imagesDecoded():void { projectToInstall = newProject } // stepRuntime() will finish installation
+		function imagesDecoded():void {
+			projectToInstall = newProject
+		} // stepRuntime() will finish installation
 		new ProjectIO(app).decodeAllImages(newProject.allObjects(), imagesDecoded);
 	}
 
@@ -949,49 +965,55 @@ public class ScratchRuntime {
 	// Keyboard input handling
 	//------------------------------
 
-	public function get shiftIsDown():Boolean {
-		return keyIsDown[Keyboard.SHIFT];
-	}
-
-	// see BitmapEdit.cropToSelection()
-	public function set shiftIsDown(value:Boolean):void {
-		keyIsDown[Keyboard.SHIFT] = value;
-	}
-
 	public function keyDown(evt:KeyboardEvent):void {
-		var ch:int = getCharCode(evt);
+		shiftIsDown = evt.shiftKey;
+		var ch:int = getKeyCodeFromEvent(evt);
 		if (!(evt.target is TextField)) startKeyHats(ch);
 		keyIsDown[ch] = true;
 	}
 
 	public function keyUp(evt:KeyboardEvent):void {
-		var ch:int = getCharCode(evt);
-		delete keyIsDown[ch];
+		shiftIsDown = evt.shiftKey;
+		var ch:int = getKeyCodeFromEvent(evt);
+		keyIsDown[ch] = false;
 	}
 
 	private function clearKeyDownArray():void {
 		keyIsDown.length = 0;
 	}
 
-	// Get a normalized "ASCII" value for the keyCode pressed:
-	// - Number keys on the numeric keypad will be mapped to ASCII digits
-	// - Other keyCodes will pass through as-is. This means:
-	//   - Letter keys will return the upper-case ASCII value (note: lower-case ASCII overlaps with other keyCodes)
-	//   - Number keys not on the numeric keypad will return the ASCII value of the corresponding digit
-	//   - Other keys (for example, arrows) will have meaningless but unique ASCII codes, useful for "any" key detection
-	private static function getCharCode(evt:KeyboardEvent):int {
-		switch (evt.keyCode) {
-			case Keyboard.NUMPAD_0: return Keyboard.NUMBER_0;
-			case Keyboard.NUMPAD_1: return Keyboard.NUMBER_1;
-			case Keyboard.NUMPAD_2: return Keyboard.NUMBER_2;
-			case Keyboard.NUMPAD_3: return Keyboard.NUMBER_3;
-			case Keyboard.NUMPAD_4: return Keyboard.NUMBER_4;
-			case Keyboard.NUMPAD_5: return Keyboard.NUMBER_5;
-			case Keyboard.NUMPAD_6: return Keyboard.NUMBER_6;
-			case Keyboard.NUMPAD_7: return Keyboard.NUMBER_7;
-			case Keyboard.NUMPAD_8: return Keyboard.NUMBER_8;
-			case Keyboard.NUMPAD_9: return Keyboard.NUMBER_9;
-			default: return evt.keyCode;
+	private static function getKeyCodeFromEvent(event:KeyboardEvent):int {
+		var charCode:int = event.charCode;
+		if (charCode == 0) {
+			switch (event.keyCode) {
+				case Keyboard.LEFT: return SCRATCH_ARROW_LEFT;
+				case Keyboard.RIGHT: return SCRATCH_ARROW_RIGHT;
+				case Keyboard.UP: return SCRATCH_ARROW_UP;
+				case Keyboard.DOWN: return SCRATCH_ARROW_DOWN;
+			}
+		}
+		return String.fromCharCode(charCode).toLowerCase().charCodeAt(0);
+	}
+
+	public static function getKeyCode(keyName:String):int {
+		switch (keyName) {
+			case 'left arrow': return SCRATCH_ARROW_LEFT;
+			case 'right arrow': return SCRATCH_ARROW_RIGHT;
+			case 'up arrow': return SCRATCH_ARROW_UP;
+			case 'down arrow': return SCRATCH_ARROW_DOWN;
+			case 'space': return Keyboard.SPACE;
+		}
+		return keyName.charCodeAt(0);
+	}
+
+	public static function getKeyName(keyCode:int):String {
+		switch (keyCode) {
+			case SCRATCH_ARROW_LEFT: return 'left arrow';
+			case SCRATCH_ARROW_RIGHT: return 'right arrow';
+			case SCRATCH_ARROW_UP: return 'up arrow';
+			case SCRATCH_ARROW_DOWN: return 'down arrow';
+			case Keyboard.SPACE: return 'space';
+			default: return String.fromCharCode(keyCode);
 		}
 	}
 

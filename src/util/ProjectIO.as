@@ -404,6 +404,140 @@ public class ProjectIO {
 		for each (var md5:String in assetsToFetch) fetchAsset(md5, assetReceived);
 	}
 
+    public function uploadProjectAssets(param1:ScratchStage, param2:Function) : void{
+//        var assetUploaded:Function = null;
+//        var assetsToUpload:Array = null;
+//        var assetCount:int = 0;
+//        var failed:Boolean = false;
+//        var asset:Object = null;
+//        var proj:ScratchStage = param1;
+//        var whenDone:Function = param2;
+//        assetUploaded = function(param1:*, param2:*, param3:*):void{
+//            var _loc4_:* = undefined;
+//            var _loc5_:* = undefined;
+//            if(param2){
+//                _loc4_ = JSON.parse(param2);
+//                if(_loc4_ && _loc4_.result && _loc4_.result.name){
+//                    _loc5_ = _loc4_.result.name;
+//                    param1.edited = false;
+//                    if(param1.ext != ".wav" && param1.ext != ".mp3"){
+//                        if(param3){
+//                            param1.textNosKey = _loc5_;
+//                        }else{
+//                            param1.nosKey = _loc5_;
+//                        }
+//                    }else{
+//                        param1.nosKey = _loc5_ || "a41b040d-8536-434e-bbd5-c9dc18e3ee281509417107316.wav";
+//                    }
+//                    if(param1 instanceof ScratchCostume){
+//                        param1.baseLayerID = -1;
+//                        param1.textLayerID = -1;
+//                    }
+//                    if(param1 instanceof ScratchSound){
+//                        param1.soundID = -1;
+//                    }
+//                    assetCount++;
+//                    if(app.lp){
+//                        app.lp.setProgress(assetCount / assetsToUpload.length);
+//                        app.lp.setInfo(assetCount + " " + Translator.map("of") + " " + assetsToUpload.length + " " + Translator.map("assets uploaded"));
+//                    }
+//                    if(assetCount == assetsToUpload.length){
+//                        app.removeLoadProgressBox();
+//                        if(!failed){
+//                            whenDone();
+//                        }
+//                    }
+//                }else{
+//                    app.removeLoadProgressBox();
+//                    app.topBarPart.refreshSaveStatus("Unsaved");
+//                    if(_loc4_.code == -2 && _loc4_.message == "尚未登录，不能操作。"){
+//                        app.setLogin(false);
+//                        app.externalCall("login");
+//                    }
+//                    failed = true;
+//                    app.log(LogLevel.WARNING,"upload asset failed");
+//                }
+//            }else{
+//                failed = true;
+//                app.log(LogLevel.WARNING,"upload asset failed");
+//            }
+//        };
+//        assetsToUpload = this.collectAssetsToUpload(proj.allObjects());
+//        assetCount = 0;
+//        failed = false;
+//        if(assetsToUpload.length == 0)
+//        {
+//            whenDone();
+//        }
+//        else
+//        {
+//            this.app.addLoadProgressBox(Translator.map("Uploading assets..."));
+//            for each(asset in assetsToUpload)
+//            {
+//                this.uploadAsset(asset,assetUploaded);
+//            }
+//        }
+    }
+
+
+    private function collectAssetsToUpload(param1:Array) : void{
+//        var _loc4_:ScratchObj = null;
+//        var _loc5_:ScratchCostume = null;
+//        var _loc6_:ScratchSound = null;
+//        var _loc2_:Array = new Array();
+//        var _loc3_:Array = new Array();
+//        for each(_loc4_ in param1)
+//        {
+//            for each(_loc5_ in _loc4_.costumes)
+//            {
+//                _loc5_.prepareToSave();
+//                if(!this.app.isSplit || _loc5_.edited){
+//                    if(_loc5_.baseLayerData.length != 0)
+//                    {
+//                        _loc2_.push(_loc5_.baseLayerMD5);
+//                        _loc3_.push({
+//                            "data":_loc5_.baseLayerData,
+//                            "costumeOrSound":_loc5_,
+//                            "isText":false,
+//                            "name":_loc5_.costumeName
+//                        });
+//                    }
+//                }
+//                if(_loc5_.textLayerMD5){
+//                    if(!this.app.isSplit || _loc5_.edited){
+//                        if(_loc5_.textLayerData.length != 0)
+//                        {
+//                            _loc2_.push(_loc5_.textLayerMD5);
+//                            _loc3_.push({
+//                                "data":_loc5_.textLayerData,
+//                                "costumeOrSound":_loc5_,
+//                                "isText":true,
+//                                "name":_loc5_.costumeName
+//                            });
+//                        }
+//                    }
+//                }
+//            }
+//            for each(_loc6_ in _loc4_.sounds)
+//            {
+//                _loc6_.prepareToSave();
+//                if(!this.app.isSplit || _loc6_.edited)
+//                {
+//                    if(_loc6_.soundData.length != 0)
+//                    {
+//                        _loc2_.push(_loc6_.md5);
+//                        _loc3_.push({
+//                            "data":_loc6_.soundData,
+//                            "costumeOrSound":_loc6_,
+//                            "isText":false,
+//                            "name":_loc6_.soundName
+//                        });
+//                    }
+//                }
+//            }
+//        }
+//        return _loc3_;
+    }
 	//----------------------------
 	// Fetch a costume or sound from the server
 	//----------------------------
