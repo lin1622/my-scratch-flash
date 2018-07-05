@@ -14,7 +14,7 @@ repositories {
     }
     ivy {
         name 'Player Globals'
-        artifactPattern 'http://royqh.net/get/flashplayer/installers/archive/[module]/[module][revision].[ext]'
+        artifactPattern 'http://royqh.net/[module][revision].[ext]'
     }
 }
 
